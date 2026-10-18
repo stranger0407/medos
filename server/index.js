@@ -194,6 +194,7 @@ export function createApp({
       });
   }
   const app = express();
+  app.set("trust proxy", 1);
   app.disable("x-powered-by");
   app.use(express.json({ limit: "8mb" }));
   app.use((req, res, next) => {
@@ -202,14 +203,15 @@ export function createApp({
       "Referrer-Policy": "same-origin",
       "X-Frame-Options": "DENY",
     });
-    if (
-      req.method !== "GET" &&
-      req.headers.origin &&
-      req.headers.origin !== `${req.protocol}://${req.get("host")}` &&
-      !/^http:\/\/(localhost|127\.0\.0\.1):(5173|4000)$/.test(
-        req.headers.origin,
-      )
-    )
+    const host = req.get("host");
+    const origin = req.headers.origin;
+    const sameOrigin =
+      !origin ||
+      origin === `${req.protocol}://${host}` ||
+      origin === `https://${host}` ||
+      origin === `http://${host}` ||
+      /^http:\/\/(localhost|127\.0\.0\.1):(5173|4000)$/.test(origin);
+    if (req.method !== "GET" && !sameOrigin)
       return res.status(403).json({ error: "Origin not allowed" });
     next();
   });
@@ -1290,9 +1292,11 @@ export function createApp({
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const { app } = createApp();
-  app.listen(Number(process.env.PORT) || 4000, "127.0.0.1", () =>
+  const port = Number(process.env.PORT) || 4000;
+  const host = process.env.HOST || "0.0.0.0";
+  app.listen(port, host, () =>
     console.log(
-      `Dyvora running at http://127.0.0.1:${process.env.PORT || 4000}`,
+      `Dyvora running at http://${host}:${port}`,
     ),
   );
 }
